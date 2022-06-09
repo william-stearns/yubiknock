@@ -1,0 +1,105 @@
+#!/bin/bash
+#Copyright 2011-2022 William Stearns <william.l.stearns@gmail.com>
+#Released under the GPL 3.0
+#Dedicated to Matthew Hathaway, who left us too soon.
+
+#Version 1.0.0
+
+#This is intended to be placed in /usr/bin/ and called from
+#yubiknock.py when a valid Yubikey One Time Password is received.
+#It should be copied to yubiknock-authorize and made executable by running:
+#chmod 755 /usr/bin/yubiknock-authorize
+#This script can inspect the OTP ID (the first 12 characters) and 
+#decide what action to take; see the "case" block near the end.
+
+#If this script needs to run any commands as root (such as the "iptables"
+#commands in the example below), you have two choices:
+#1) Run yubiknock.py as root
+#2) Run any root-requiring commands inside sudo.  This will require changes to
+#the /etc/sudoers command to allow running certain commands without password, and 
+#may also require setting "requiretty" to "off" if it isn't already (the default is "off")
+
+
+#Return codes
+#0 Success
+#1 Generic failure
+#2 Invalid address or Yubikey Identity
+
+#To troubleshoot, take a look at your system logs (perhaps
+#/var/log/messages or /var/log/syslog ).  The script should
+#provide some basic troubleshooting via the "logger" commands
+#throughout.
+
+#Params
+#$1 IP address that should be given access (currently ipv4 or ipv6)
+#$2 44 char Yubikey OTP
+
+
+export PATH="$PATH:/sbin/:/usr/sbin/"		#Make sure we have at least these two directories in the search path.  If you need others, add them here.
+
+
+if echo "$1" | grep -q '^[12]\{0,1\}[0-9]\{1,2\}\.[12]\{0,1\}[0-9]\{1,2\}\.[12]\{0,1\}[0-9]\{1,2\}\.[12]\{0,1\}[0-9]\{1,2\}$' ; then
+	#Valid ipv4 format
+	ipformat='ipv4'
+	ipaddress="$1"
+elif echo "$1" | grep -q '^[0-9a-fA-F:][0-9a-fA-F:]*$' ; then
+	#Valid ipv6 format
+	ipformat='ipv6'
+	ipaddress="$1"
+else
+	logger -t yubiknock-authorize "Invalid IP address format, exiting."
+	exit 2
+fi
+
+if echo "$2" | grep -q '^[bcdefghijklnrtuv]\{12\}$' ; then
+	:	#Valid yubikey Identity format
+else
+	logger -t yubiknock-authorize "Invalid Yubikey Identity format, exiting."
+	exit 2
+fi
+
+YubiKeyIdentity="$2"
+
+Now=$(date +%s)		#Timestamp, in "integer seconds since Jan 1 1970" format
+
+
+case "$YubiKeyIdentity" in
+#The following line lists the identity (first 12 characters from their respective one-time password)
+#for 2 different yubikeys.  They're separated with a vertical pipe.
+#You'll need to replace these samples with the IDs from your own key(s).
+cccccccbdknh|cccccctgdruv)
+	#Now that we've found one of these two yubikeys, we're going to 
+	#execute the commands below.
+	#
+	#The following command allows incoming packets if:
+	#- they're from the IP address that submitted the yubikey OTP
+	#- they're headed to destination port 22 (commonly ssh)
+	#It also places the 12 character YubkKeyIdentity and a timestamp in the firewall comment field.
+	#A different process could use this to later scan through these and delete any firewall rules older than a certain number of seconds
+	if [ "$ipformat" = "ipv4" ]; then
+		logger -t yubiknock-authorize "yubikey found: $YubiKeyIdentity - opening ssh access from ipv4 $ipaddress"
+		/sbin/iptables -I INPUT -s "$ipaddress" -p tcp --dport 22 -m comment --comment "$YubiKeyIdentity $Now" -j ACCEPT
+	elif [ "$ipformat" = "ipv6" ]; then
+		logger -t yubiknock-authorize "yubikey found: $YubiKeyIdentity - opening ssh access from ipv6 $ipaddress"
+		/usr/bin/sudo /sbin/ip6tables -I INPUT -s "$ipaddress" -p tcp --dport 22 -m comment --comment "$YubiKeyIdentity $Now" -j ACCEPT
+	else
+		logger -t yubiknock-authorize "Unrecognized IP address format, exiting."
+	fi
+	;;
+cccccccnhbdk)
+	#This third yubikey is a test key with a different action, so we give it its own block.
+	#In this case we're only writing out a log entry to show that it was seen.
+	logger -t yubiknock-authorize "Test yubikey found: $YubiKeyIdentity"
+	;;
+#Additional sections for other keys can be added here.  Make sure that each section has one 
+#or more 12 character yubikey IDs (separated by vertical pipes, list ending in ")" ),
+#one or more commands to be run, likely using the "$ipaddress" variable, and ending in 
+#two semicolons.
+#
+#This last block starts with "*)", which matches anything in the YubiKeyIdentity.  It spits out an error
+#so we can later look at the logs and realize this script needs to be updated with a new identity.
+*)
+	logger -t yubiknock-authorize "No known action to take for Yubikey OTP starting with $YubiKeyIdentity"
+	exit 2
+	;;
+esac

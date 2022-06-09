@@ -2,7 +2,7 @@
 """Validate yubikey OTPs sent to port 8975 on this system, and if valid, run a command that makes a change on the system."""
 #Dedicated to Matthew Hathaway, who left us too soon.
 
-__version__ = '1.5.2'
+__version__ = '1.5.3'
 
 __author__ = 'William Stearns'
 __copyright__ = 'Copyright 2011-2022, William Stearns'
@@ -27,9 +27,11 @@ try:
 except ImportError:
 	secrets_loaded = False				#We'll fallback to using random.choice for python 3.5 and below
 
-try:
+#try:
+if sys.version_info[0] >= 3:
 	import urllib.request as urllib2		#For python 3
-except ImportError:
+#except ImportError:
+else:
 	import urllib2					#Fallback if run under python2
 
 
@@ -46,7 +48,7 @@ hex_chars = '0123456789abcdef'
 
 
 #======== Functions ========
-def Debug(should_debug, DebugStr):
+def Debug(should_debug: bool, DebugStr: str):
 	"""Prints a note to stderr and saves to syslog."""
 
 	if should_debug:
@@ -55,8 +57,9 @@ def Debug(should_debug, DebugStr):
 		syslog.syslog(DebugStr)
 
 
-def ReceiveKey(net_socket):
+def ReceiveKey(net_socket) -> str:
 	"""Look for a potential yubikey 44 character code in the block of data from the client.  If received, send it up."""
+	#Unclear how to add a ": type" entry for a socket/bytes.
 
 	InText = ''
 	Result = ''
@@ -74,7 +77,7 @@ def ReceiveKey(net_socket):
 	return Result
 
 
-def VerifyOTP(clientId, otp):
+def VerifyOTP(clientId: str, otp: str) -> bool:
 	"""Contact Yubico's authentication server to validate key.  Return true if valid, false otherwise."""
 	#Reference: https://developers.yubico.com/yubikey-val/Getting_Started_Writing_Clients.html
 
