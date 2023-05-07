@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Author: Roman Ovchinnikov <roman@omnicasa.com>
+# Sponsored by: Omnicasa https://www.omnicasa.com/
+
+# normal reaction is under 1 second, if takes longer => we are stuck
+
+
+WGET_RETRIES=1
+WGET_TIMEOUT_ALIVE=5 # seconds
+WGET_TIMEOUT_CODE=4
+WGET_403_CODE=8
+URL='http://127.0.0.1:8975/zzzzccfcrjlkbhlnjdtrXXXXXXX'
+WGET='wget'
+#WGET='echo wget'
+WGET_PARAMS="-q"
+#WGET_PARAMS="-S"
+RESTART_COMMAND="systemctl restart yubiknock-softether.service"
+
+myname="yubiknock-liveness-check"
+
+
+# 1st
+$WGET -t "${WGET_RETRIES}" -T "${WGET_TIMEOUT_ALIVE}" -O /dev/null ${WGET_PARAMS} "${URL}" 
+rcode1=$?
+
+if [ $rcode1 -ne "$WGET_403_CODE" ];then 
+	$WGET -t "${WGET_RETRIES}" -T "${WGET_TIMEOUT_ALIVE}" -O /dev/null ${WGET_PARAMS} "${URL}"
+	rcode2=$?
+else
+	logger -t "${myname}" "check #1: service seems to be okay, doing nothing, exiting"
+	exit 0
+fi
+
+
+if [ $rcode2 -ne "$WGET_403_CODE" ];then 
+	logger -t "${myname}" "service seems to be stuck, restarting"
+	$RESTART_COMMAND
+else
+	logger -t "${myname}" "check #2: service seems to be okay, doing nothing, exiting"
+	exit 0
+fi
