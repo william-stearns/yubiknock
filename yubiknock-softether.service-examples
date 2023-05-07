@@ -1,0 +1,61 @@
+# Systemd service file for YubiKnock Service for SoftEther
+# Author: Roman Ovchinnikov <roman@omnicasa.com>
+# Sponsored by: Omnicasa https://www.omnicasa.com/
+#
+[Unit]
+Description=YubiKnock service for SoftEther
+Documentation=https://jira.company.com/browse/SYSADMIN-XXXXX
+After=network.target
+
+[Service]
+User=root
+Group=root
+
+WorkingDirectory=/opt/scripts/yubiknock/yubiknock/
+ExecStart=/opt/scripts/yubiknock/yubiknock/yubiknock.py  -e /opt/scripts/yubiknock/yubiknock/yubiknock-fw-update.sh -c 8xxxx -d
+
+KillMode=process
+Restart=on-failure
+RestartSec=50s
+
+
+LimitRSS=128M
+
+IPAccounting=yes
+CPUAccounting=yes
+MemoryAccounting=yes
+TasksAccounting=yes
+MemoryMax=256M
+CPUQuota=20%
+
+
+CapabilityBoundingSet=
+#CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_CHOWN CAP_DAC_OVERRIDE
+#CapabilityBoundingSet=CAP_CHOWN CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+LockPersonality=yes
+#MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectProc=invisible
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+#ProtectHome=tmpfs
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectSystem=strict
+#RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+#IPAddressAllow=localhost
+#IPAddressDeny=any
+
+ReadOnlyPaths=/
+
+[Install]
+WantedBy=multi-user.target
